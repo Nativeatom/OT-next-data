@@ -34,3 +34,5 @@ external/
 
 # Website data stays private (published as a private claude.ai Artifact, not in this public repo).
 docs/data/
+
+.agents/

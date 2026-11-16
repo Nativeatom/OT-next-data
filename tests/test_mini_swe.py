@@ -134,7 +134,7 @@ def test_shared_overrides_and_unknown_model_defaults():
     assert request_kwargs(judge_agent_kwargs('openai/unknown', 'mini-swe-agent')) == {}
 
 
-@pytest.mark.parametrize('prefix', ['openai/', 'hosted_vllm/'])
+@pytest.mark.parametrize('prefix', ['openai/', 'hosted_vllm/', 'openrouter/'])
 def test_local_http_preserves_reasoning_and_budget(tmp_path, monkeypatch, prefix):
     import httpx
     import openai
@@ -157,6 +157,32 @@ def test_local_http_preserves_reasoning_and_budget(tmp_path, monkeypatch, prefix
     assert bodies[0]['chat_template_kwargs']['reasoning_effort'] == 'max'
     assert bodies[0]['model'] == 'glm' and bodies[0]['tools']
     assert result.usage.completion_tokens == 10
+
+
+def test_openrouter_uses_openrouter_key_with_native_transport(monkeypatch):
+    import httpx
+    import openai
+    from harbor_patches.mini_swe import completion
+    created = []
+
+    async def handler(request):
+        return httpx.Response(200, json=response('echo done').model_dump())
+
+    real = openai.AsyncOpenAI
+
+    def factory(**kwargs):
+        created.append(kwargs)
+        return real(base_url=kwargs['base_url'], api_key=kwargs['api_key'],
+                    http_client=httpx.AsyncClient(transport=httpx.MockTransport(handler)))
+
+    monkeypatch.setattr(openai, 'AsyncOpenAI', factory)
+    monkeypatch.setenv('OPENROUTER_API_KEY', 'router-key')
+    monkeypatch.delenv('OPENAI_API_KEY', raising=False)
+    asyncio.run(completion('openrouter/qwen/qwen3.8-27b',
+                            [{'role': 'user', 'content': 'Task'}],
+                            {'api_base': 'https://openrouter.ai/api/v1'}))
+    assert created[0]['api_key'] == 'router-key'
+    assert created[0]['base_url'] == 'https://openrouter.ai/api/v1'
 
 
 @pytest.mark.parametrize('override,env,expected', [

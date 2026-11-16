@@ -257,6 +257,9 @@ class SetupEnvironment:
             from uuid import uuid4
             token = uuid4().hex
             target = '/tmp/ot-pytest-execution-' + token
+            # Docker's `cp` destination must already exist; upload_file does not
+            # create parent directories for target paths.
+            await self.environment.exec(f'mkdir -p {shlex.quote(target)}', user='root')
             await self.environment.upload_file(
                 source_path=Path(__file__).with_name('ot_pytest_execution.py'),
                 target_path=target + '/ot_pytest_execution.py')

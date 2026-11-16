@@ -96,10 +96,16 @@ async def completion(model, messages, kwargs):
     """Use native OpenAI transport for local endpoints: LiteLLM strips reasoning there."""
     import litellm
     from openai import AsyncOpenAI
-    if model.startswith(('hosted_vllm/', 'openai/')):
+    # OpenRouter exposes an OpenAI-compatible chat-completions endpoint.  Keep
+    # it on the native path as well: the generic LiteLLM path may reinterpret
+    # provider-prefixed model names and drops provider-specific reasoning
+    # fields needed by the judge.
+    if model.startswith(('hosted_vllm/', 'openai/', 'openrouter/')):
         options = deepcopy(kwargs)
         base = options.pop('api_base', None) or os.environ.get('OPENAI_API_BASE') or os.environ.get('OPENAI_BASE_URL')
-        key = os.environ.get('OPENAI_API_KEY') or ('EMPTY' if base else None)
+        provider = model.split('/', 1)[0]
+        key_name = 'OPENROUTER_API_KEY' if provider == 'openrouter' else 'OPENAI_API_KEY'
+        key = os.environ.get(key_name) or ('EMPTY' if base else None)
         timeout = request_timeout(options)
         async with AsyncOpenAI(base_url=base, api_key=key, max_retries=0, timeout=timeout) as client:
             response = await client.chat.completions.create(
