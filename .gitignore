@@ -36,3 +36,6 @@ external/
 docs/data/
 
 .agents/
+
+.DS_Store
+*/.DS_Store
